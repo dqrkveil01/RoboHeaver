@@ -21,7 +21,6 @@ pkg update -y && pkg upgrade -y
 pkg install git -y
 
 # 2. Clone o repositório do RoboReaver
-# !! TROQUE 'SEU-USUARIO' E 'SEU-REPOSITORIO' PELO LINK REAL !!
 git clone https://github.com/dqrkveil01/RoboHeaver/
 
 # 3. Entre no diretório da ferramenta
