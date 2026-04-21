@@ -1,5 +1,5 @@
 #!/bin/bash
-# RoboReaver v3 - Instalador Detalhado
+# RoboReaver v4 - Instalador Transparente
 
 # --- CORES ---
 C='\033[0;36m' # Cyan
@@ -10,31 +10,42 @@ NC='\033[0m'   # No Color
 
 clear
 echo -e "${R}=====================================================${NC}"
-echo -e "${Y}      INSTALADOR DO ROBOREAVER v3: ANNIHILATOR       ${NC}"
+echo -e "${Y}         ROBOREAVER v4: THE COLOSSUS - SETUP         ${NC}"
 echo -e "${R}=====================================================${NC}"
 echo ""
-echo -e "${C}[ETAPA 1/4]${NC} Atualizando os repositórios do Termux..."
-echo -e "${Y}Isso pode demorar um pouco, por favor, aguarde...${NC}"
+
+# ETAPA 1
+echo -e "${C}[ETAPA 1/3]${NC} Atualizando repositórios do Termux..."
+echo -e "${Y}--- SAÍDA DO COMANDO ABAIXO ---${NC}"
 pkg update -y
+echo -e "${Y}-------------------------------${NC}"
 echo -e "${G}[SUCESSO]${NC} Repositórios atualizados."
 echo ""
+sleep 1
 
-echo -e "${C}[ETAPA 2/4]${NC} Instalando pacotes essenciais (git, python)..."
+# ETAPA 2
+echo -e "${C}[ETAPA 2/3]${NC} Instalando pacotes essenciais (git, python)..."
+echo -e "${Y}--- SAÍDA DO COMANDO ABAIXO ---${NC}"
 pkg install -y git python
+echo -e "${Y}-------------------------------${NC}"
 echo -e "${G}[SUCESSO]${NC} Pacotes essenciais instalados."
 echo ""
+sleep 1
 
-echo -e "${C}[ETAPA 3/4]${NC} Criando diretórios para logs e checkpoints..."
-mkdir -p logs
-mkdir -p checkpoints
-echo -e "${G}[SUCESSO]${NC} Diretórios criados."
-echo ""
-
-echo -e "${C}[ETAPA 4/4]${NC} Dando permissão de execução à ferramenta principal..."
+# ETAPA 3
+echo -e "${C}[ETAPA 3/3]${NC} Dando permissão de execução ao Colossus..."
 chmod +x reaver.py
-echo -e "${G}[SUCESSO]${NC} Permissão concedida."
+echo -e "${G}[SUCESSO]${NC} Permissão de aniquilação concedida."
 echo ""
+sleep 1
 
+# FINALIZAÇÃO
+echo -e "${R}=====================================================${NC}"
+echo -e "${G}     O COLOSSUS ESTÁ PRONTO PARA A BATALHA.          ${NC}"
+echo -e "${R}=====================================================${NC}"
+echo -e "\nO script principal instalará as bibliotecas Python necessárias."
+echo -e "Para iniciar, use: ${Y}python reaver.py${NC}"
+echo ""
 echo -e "${G}=====================================================${NC}"
 echo -e "${G}   TUDO PRONTO! A MÁQUINA DE GUERRA ESTÁ MONTADA.    ${NC}"
 echo -e "${G}=====================================================${NC}"
