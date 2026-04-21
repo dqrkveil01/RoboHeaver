@@ -14,7 +14,6 @@ import os
 import sys
 import subprocess
 import time
-import requests
 import threading
 from colorama import Fore, Style, init
 import json
